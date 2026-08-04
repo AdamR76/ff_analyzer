@@ -1,0 +1,9 @@
+nflreadpy>=0.1.5
+polars>=1.43
+duckdb>=1.5
+pyarrow>=25.0
+pydantic>=2.13
+pydantic-settings>=2.14
+python-dotenv>=1.2
+tqdm>=4.70
+pytest>=8.0

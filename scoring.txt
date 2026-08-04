@@ -1,0 +1,111 @@
+# Fantasy Football Scoring Rules
+# Format: stat_key | points | unit | description
+#   stat_key   — unique machine-readable key
+#   points     — fantasy points awarded (float, negative = penalty)
+#   unit       — what triggers this: "per_yd", "per_td", "per_cmp", "game", "range"
+#   description — human label
+# Lines starting with # are comments. Blank lines ignored.
+
+# --- Passing ---
+pass_yd        |  0.05 | per_yd    | Passing yards
+pass_td        |  6.00 | per_td    | Passing touchdown
+pass_td_40     |  2.00 | per_td    | 40+ yard pass TD bonus (stacks with pass_td)
+pass_td_50     |  3.00 | per_td    | 50+ yard pass TD bonus (stacks with pass_td)
+pass_2pt       |  2.00 | per_2pt   | 2-point conversion (passer)
+pass_int       | -2.00 | per_int   | Interception thrown
+pick_six       | -4.00 | per_td    | Pick-six thrown (stacks with pass_int)
+pass_cmp       |  0.50 | per_cmp   | Pass completed
+qb_sack        | -1.00 | per_sack  | QB sacked
+
+# --- Rushing ---
+rush_yd        |  0.10 | per_yd    | Rushing yards
+rush_td        |  6.00 | per_td    | Rushing touchdown
+rush_2pt       |  2.00 | per_2pt   | 2-point conversion (rusher)
+rush_att       |  0.50 | per_att   | Rush attempt
+rush_td_40     |  3.00 | per_td    | 40+ yard rush TD bonus (stacks with rush_td)
+rush_td_50     |  4.00 | per_td    | 50+ yard rush TD bonus (stacks with rush_td)
+
+# --- Receiving ---
+rec            |  1.00 | per_rec   | Reception (full PPR)
+rec_yd         |  0.10 | per_yd    | Receiving yards
+rec_td         |  6.00 | per_td    | Receiving touchdown
+rec_2pt        |  2.00 | per_2pt   | 2-point conversion (receiver)
+rec_30_39      |  0.50 | per_rec   | 30-39 yard reception bonus
+rec_40         |  1.00 | per_rec   | 40+ yard reception bonus
+rec_td_40      |  3.00 | per_td    | 40+ yard rec TD bonus (stacks with rec_td)
+rec_td_50      |  5.00 | per_td    | 50+ yard rec TD bonus (stacks with rec_td)
+
+# --- Kicking ---
+fg_yd          |  0.12 | per_yd    | Points per FG yard (e.g. 50yd FG = 6.0 pts)
+pat_made       |  1.00 | per_pat   | PAT made
+fg_miss_0_19   | -3.00 | per_miss  | FG missed 0-19 yards
+fg_miss_20_29  | -2.00 | per_miss  | FG missed 20-29 yards
+fg_miss_30_39  | -1.00 | per_miss  | FG missed 30-39 yards
+pat_miss       | -2.00 | per_miss  | PAT missed
+
+# --- Team Defense ---
+def_td         |  6.00 | per_td    | Defensive touchdown
+def_pa_0       | 30.00 | game      | Points allowed: 0 (shutout)
+def_pa_1_6     | 25.00 | game      | Points allowed: 1-6
+def_pa_7_13    | 15.00 | game      | Points allowed: 7-13
+def_pa_14_20   |  5.00 | game      | Points allowed: 14-20
+def_pa_28_34   | -2.00 | game      | Points allowed: 28-34
+def_pa_35_plus | -5.00 | game      | Points allowed: 35+
+def_yd_lt_100  |  5.00 | game      | Less than 100 total yards allowed
+def_yd_100_199 |  3.00 | game      | 100-199 total yards allowed
+def_3nout      |  3.00 | per_3nout | 3 and out forced
+def_4down_stop |  3.00 | per_stop  | 4th down stop
+def_sack       |  1.00 | per_sack  | Sack
+def_int        |  3.00 | per_int   | Interception
+def_fum_rec    |  3.00 | per_fum   | Fumble recovery
+def_tfl        |  1.00 | per_tfl   | Tackle for loss
+def_safety     |  5.00 | per_safety| Safety
+def_ff         |  3.00 | per_ff    | Forced fumble
+def_blk_kick   |  3.00 | per_block | Blocked kick
+def_2pt_ret    |  4.00 | per_2pt   | 2-point conversion return
+
+# --- Special Teams Defense ---
+st_td          |  6.00 | per_td    | Special teams TD
+st_ff          |  1.00 | per_ff    | Special teams forced fumble
+st_fum_rec     |  1.00 | per_fum   | Special teams fumble recovery
+
+# --- Special Teams Player ---
+stp_td         |  6.00 | per_td    | Special teams player TD
+stp_ff         |  1.00 | per_ff    | Special teams player forced fumble
+stp_fum_rec    |  1.00 | per_fum   | Special teams player fumble recovery
+
+# --- Miscellaneous ---
+fum_lost       | -2.00 | per_fum   | Fumble lost
+fum_rec_td     |  6.00 | per_td    | Fumble recovery TD
+
+# --- Bonuses ---
+bonus_rush_100 |  3.00 | game      | 100-199 yard rushing game
+bonus_rush_200 |  5.00 | game      | 200+ yard rushing game
+bonus_rec_100  |  2.00 | game      | 100-199 yard receiving game
+bonus_rec_200  |  5.00 | game      | 200+ yard receiving game
+bonus_pass_400 |  3.00 | game      | 400+ yard passing game
+bonus_yd_100   |  2.00 | game      | 100-199 combined rush+rec yards
+bonus_yd_200   |  5.00 | game      | 200+ combined rush+rec yards
+bonus_25cmp    |  2.00 | game      | 25+ pass completions
+bonus_20car    |  2.00 | game      | 20+ rush attempts
+bonus_qb_1st   |  1.00 | per_1st   | First down bonus — QB
+
+# --- IDP (Individual Defensive Players) ---
+idp_td         |  6.00 | per_td    | IDP touchdown
+idp_sack       |  4.00 | per_sack  | Sack
+idp_qb_hit     |  1.00 | per_td    | Hit on QB (per event)
+idp_tackle     |  1.00 | per_td    | Tackle (combined)
+idp_tfl        |  2.00 | per_tfl   | Tackle for loss
+idp_blk_kick   |  3.00 | per_block | Blocked punt, PAT or FG
+idp_int        |  6.00 | per_int   | Interception
+idp_int_yd     |  0.10 | per_yd    | INT return yards
+idp_fum_rec    |  3.00 | per_fum   | Fumble recovery
+idp_fum_yd     |  0.10 | per_yd    | Fumble return yards
+idp_ff         |  3.00 | per_ff    | Forced fumble
+idp_safety     |  3.00 | per_safety| Safety
+idp_ast_tackle |  1.00 | per_td    | Assisted tackle
+idp_solo_tackle|  2.00 | per_td    | Solo tackle
+idp_pass_def   |  3.00 | per_td    | Pass defended
+idp_tackle_10  |  2.00 | game      | 10+ tackle bonus
+idp_int_td_50  |  2.00 | per_td    | 50+ yard INT return TD bonus
+idp_fum_td_50  |  2.00 | per_td    | 50+ yard fumble return TD bonus

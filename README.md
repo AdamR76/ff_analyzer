@@ -11,7 +11,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Run full pipeline (fetch → score → project → rank)
-python run_pipeline.py --pick 5
+python run_pipeline.py --pick 5 --scoring path/to/file --roster path/to/roster
 
 # Run individual stages
 python fetch.py

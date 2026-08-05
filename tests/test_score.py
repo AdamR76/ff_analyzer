@@ -167,3 +167,67 @@ def test_apply_scoring_mixed_per_and_game_rules():
     assert result["fantasy_points"][1] == 8.0
     assert "pp_rush_yd" in result.columns
     assert "pp_bonus_rush_100" in result.columns
+
+
+def test_idp_tackle_derived_before_per_unit():
+    """idp_tackle (solo+assist) must be derived BEFORE per-unit loop so
+    the pp_idp_tackle column is created."""
+    df = pl.DataFrame({
+        "player_id": ["A", "B"],
+        "position": ["LB", "DB"],
+        "def_tackles_solo": [5, 3],
+        "def_tackle_assists": [2, 1],
+    })
+    rules = [
+        {"stat_key": "idp_tackle", "points": 1.0, "unit": "per_td"},
+    ]
+
+    result = _apply_scoring_to_df(df, rules)
+
+    assert "pp_idp_tackle" in result.columns
+    # LB: (5+2) * 1.0 = 7.0, DB: (3+1) * 1.0 = 4.0
+    assert result["pp_idp_tackle"][0] == 7.0
+    assert result["pp_idp_tackle"][1] == 4.0
+
+
+def test_fg_yd_scores_from_fg_made_distance():
+    """fg_yd rule scores 0.12 pts per FG yard from fg_made_distance."""
+    df = pl.DataFrame({
+        "player_id": ["K1", "K2", "K3"],
+        "position": ["K", "K", "K"],
+        "fg_made_distance": [110, 50, 0],
+    })
+    rules = [
+        {"stat_key": "fg_yd", "points": 0.12, "unit": "per_yd"},
+    ]
+
+    result = _apply_scoring_to_df(df, rules)
+
+    assert "pp_fg_yd" in result.columns
+    # 110 * 0.12 = 13.2, 50 * 0.12 = 6.0, 0 * 0.12 = 0.0
+    assert result["pp_fg_yd"][0] == 13.2
+    assert result["pp_fg_yd"][1] == 6.0
+    assert result["pp_fg_yd"][2] == 0.0
+
+
+def test_fg_miss_brackets_40_49_50_59():
+    """FG miss brackets 40-49 and 50-59 are scored."""
+    df = pl.DataFrame({
+        "player_id": ["K1", "K2"],
+        "position": ["K", "K"],
+        "fg_missed_40_49": [1, 0],
+        "fg_missed_50_59": [0, 2],
+    })
+    rules = [
+        {"stat_key": "fg_miss_40_49", "points": -1.0, "unit": "per_miss"},
+        {"stat_key": "fg_miss_50_59", "points": -1.0, "unit": "per_miss"},
+    ]
+
+    result = _apply_scoring_to_df(df, rules)
+
+    assert "pp_fg_miss_40_49" in result.columns
+    assert "pp_fg_miss_50_59" in result.columns
+    assert result["pp_fg_miss_40_49"][0] == -1.0
+    assert result["pp_fg_miss_40_49"][1] == 0.0
+    assert result["pp_fg_miss_50_59"][0] == 0.0
+    assert result["pp_fg_miss_50_59"][1] == -2.0

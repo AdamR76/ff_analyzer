@@ -55,7 +55,7 @@ def test_parse_scoring_rules_real_file():
 
     scoring_path = Path(__file__).parent.parent / "scoring.txt"
     rules = parse_scoring_rules(scoring_path)
-    assert len(rules) == 84
+    assert len(rules) == 86
 
     # Spot-check a few rules
     pass_yd = next(r for r in rules if r["stat_key"] == "pass_yd")

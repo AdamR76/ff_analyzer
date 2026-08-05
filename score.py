@@ -75,6 +75,15 @@ def _apply_scoring_to_df(df: pl.DataFrame, rules: list[dict]) -> pl.DataFrame:
         fantasy_points: float  -- total fantasy points
         pp_{stat_key}: float   -- points from each rule (prefix 'pp_')
     """
+    # Derive combined columns FIRST — must exist before per-unit
+    # expression building so rules like idp_tackle find their columns.
+    if "def_tackles_solo" in df.columns and "def_tackle_assists" in df.columns:
+        df = df.with_columns(
+            (pl.col("def_tackles_solo").fill_null(0)
+             + pl.col("def_tackle_assists").fill_null(0))
+            .alias("idp_tackle")
+        )
+
     groups = group_rules_by_unit(rules)
     point_exprs = []
     has_position = "position" in df.columns
@@ -111,15 +120,6 @@ def _apply_scoring_to_df(df: pl.DataFrame, rules: list[dict]) -> pl.DataFrame:
                     expr = base_expr.alias(col_name)
 
                 point_exprs.append(expr)
-
-    # Derive combined columns that scoring.txt rules reference but
-    # nflreadpy does not provide directly.
-    if "def_tackles_solo" in df.columns and "def_tackle_assists" in df.columns:
-        df = df.with_columns(
-            (pl.col("def_tackles_solo").fill_null(0)
-             + pl.col("def_tackle_assists").fill_null(0))
-            .alias("idp_tackle")
-        )
 
     if point_exprs:
         df = df.with_columns(point_exprs)

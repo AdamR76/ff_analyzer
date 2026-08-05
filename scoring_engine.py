@@ -48,8 +48,10 @@ COLUMN_MAP: dict[str, str] = {
     "fg_miss_0_19":  "fg_missed_0_19",
     "fg_miss_20_29": "fg_missed_20_29",
     "fg_miss_30_39": "fg_missed_30_39",
+    "fg_miss_40_49": "fg_missed_40_49",
+    "fg_miss_50_59": "fg_missed_50_59",
     "pat_miss":      "pat_missed",
-    # fg_yd — needs derivation from fg_made_distance (list column), not mapped
+    "fg_yd":         "fg_made_distance",
 
     # Team Defense (individual player-level; also available in team_stats)
     "def_td":      "def_tds",

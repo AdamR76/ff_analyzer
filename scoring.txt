@@ -41,6 +41,8 @@ pat_made       |  1.00 | per_pat   | PAT made
 fg_miss_0_19   | -3.00 | per_miss  | FG missed 0-19 yards
 fg_miss_20_29  | -2.00 | per_miss  | FG missed 20-29 yards
 fg_miss_30_39  | -1.00 | per_miss  | FG missed 30-39 yards
+fg_miss_40_49  | -1.00 | per_miss  | FG missed 40-49 yards
+fg_miss_50_59  | -1.00 | per_miss  | FG missed 50-59 yards
 pat_miss       | -2.00 | per_miss  | PAT missed
 
 # --- Team Defense ---

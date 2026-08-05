@@ -41,6 +41,14 @@ def load_config(draft_position: int | None = None) -> dict:
         "roster_file": Path(os.getenv("FF_ROSTER_FILE", "roster.txt")),
         "data_dir": Path(os.getenv("FF_DATA_DIR", "data")),
         "output_dir": Path(os.getenv("FF_OUTPUT_DIR", "output")),
+        # Projection feature flags
+        "age_curve_enabled": os.getenv("FF_AGE_CURVE", "true").lower() == "true",
+        "wr_breakout_enabled": os.getenv("FF_WR_BREAKOUT", "true").lower() == "true",
+        "te_elite_enabled": os.getenv("FF_TE_ELITE", "true").lower() == "true",
+        "qb_rushing_baseline_enabled": os.getenv("FF_QB_RUSHING_BASELINE", "true").lower() == "true",
+        "injury_model_enabled": os.getenv("FF_INJURY_MODEL", "true").lower() == "true",
+        "trend_adjustment_enabled": os.getenv("FF_TREND_ADJUST", "true").lower() == "true",
+        "shrinkage_enabled": os.getenv("FF_SHRINKAGE", "true").lower() == "true",
     }
 
 

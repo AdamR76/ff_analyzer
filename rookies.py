@@ -38,21 +38,51 @@ _ROOKIE_HIT_RATES = {
 }
 
 
-def _get_hit_rate(position: str, round_num: int) -> float:
-    """Return rookie hit-rate multiplier for a position and draft round."""
+def _get_hit_rate(
+    position: str, round_num: int,
+    computed_rates: dict | None = None,
+) -> float:
+    """Return rookie hit-rate multiplier for a position and draft round.
+
+    Uses computed rates from historical data when available,
+    falls back to hardcoded table.
+    """
     if position in ("K", "DEF", "LB", "DB"):
         return 1.0
     tier = min(round_num, 4)
+    if computed_rates:
+        rate = computed_rates.get((position, tier))
+        if rate is not None:
+            return rate
     return _ROOKIE_HIT_RATES.get((position, tier), 0.50)
 
 
-def _round_baseline(position: str, round_num: int) -> dict:
+def _round_baseline(
+    position: str, round_num: int,
+    computed_baselines: dict | None = None,
+) -> dict:
     """Return fallback projection dict for a rookie based on draft round.
 
     Rounds 4+ all use the round-4 baseline.
     Unknown positions (K, DEF, LB, DB) get small baseline.
+
+    Uses computed baselines from historical data when available,
+    falls back to hardcoded table.
     """
     tier = min(round_num, 4)
+    if computed_baselines:
+        pts = computed_baselines.get((position, tier))
+        if pts is not None:
+            return {
+                "position": position,
+                "projected_points": float(pts),
+                "projected_ppg": pts / 17,
+                "ceiling": pts / 17 * 1.2,
+                "floor": pts / 17 * 0.7,
+                "games_played_projection": 17,
+                "source": "rookie_model",
+            }
+
     points = _ROUND_BASELINES.get((position, tier), 60)
 
     return {
@@ -165,6 +195,92 @@ def _join_historical_drafts(historical: pl.DataFrame) -> pl.DataFrame:
     return historical
 
 
+def _compute_round_baselines(historical: pl.DataFrame) -> dict | None:
+    """Compute average rookie fantasy points by position and draft round.
+
+    Returns dict {(position, round): avg_points} or None if insufficient data.
+    """
+    if "pick" not in historical.columns or "round" not in historical.columns:
+        return None
+
+    # Filter out rows without valid round/pick data (join misses)
+    valid = historical.filter(
+        pl.col("round").is_not_null() & pl.col("pick").is_not_null()
+    )
+    if len(valid) == 0:
+        return None
+
+    # Aggregate game-level data to player-season totals
+    rookie_seasons = valid.group_by(
+        ["player_id", "season"]
+    ).agg(
+        pl.col("fantasy_points").sum().alias("total_points"),
+        pl.col("pick").first().alias("pick"),
+        pl.col("round").first().alias("round"),
+        pl.col("position").first().alias("position"),
+    )
+
+    # Group by position and draft round
+    baselines = rookie_seasons.group_by(["position", "round"]).agg([
+        pl.col("total_points").mean().alias("avg_points"),
+        pl.len().alias("count"),
+    ]).filter(pl.col("count") >= 3)  # minimum 3 players for reliable baseline
+
+    if len(baselines) == 0:
+        return None
+
+    result = {}
+    for row in baselines.iter_rows(named=True):
+        pos = row["position"]
+        round_val = row["round"]
+        if round_val is None:
+            continue
+        round_num = min(int(round_val), 4)
+        key = (pos, round_num)
+        avg = float(row["avg_points"])
+        # Sanity: full-season baseline should be >= 50 pts.
+        # Lower values mean single-game data or incomplete seasons.
+        if avg < 50:
+            continue
+        if key not in result:
+            result[key] = avg
+
+    return result if result else None
+
+
+def _compute_hit_rates(
+    historical: pl.DataFrame, baselines: dict
+) -> dict | None:
+    """Compute rookie hit rates from historical data.
+
+    Hit rate = fraction of rookies at each (position, round) that scored
+    above the position-round baseline.
+    """
+    if baselines is None:
+        return None
+    if "round" not in historical.columns:
+        return None
+
+    rookie_seasons = historical.group_by(
+        ["player_id", "season"]
+    ).agg(
+        pl.col("fantasy_points").sum().alias("total_points"),
+        pl.col("round").first().alias("round"),
+        pl.col("position").first().alias("position"),
+    )
+
+    result = {}
+    for (pos, round_num), baseline in baselines.items():
+        group = rookie_seasons.filter(
+            (pl.col("position") == pos) & (pl.col("round") == round_num)
+        )
+        if len(group) >= 3:
+            hits = len(group.filter(pl.col("total_points") >= baseline))
+            result[(pos, round_num)] = hits / len(group)
+
+    return result if result else None
+
+
 def project_rookies(
     scored_data_dir: Path,
     draft_data: pl.DataFrame,
@@ -196,6 +312,10 @@ def project_rookies(
 
     # Get set of player_ids already in historical data (veterans)
     existing_ids = set(historical["player_id"].unique().to_list())
+
+    # Compute data-driven baselines and hit rates from historical rookies
+    computed_baselines = _compute_round_baselines(historical)
+    computed_hit_rates = _compute_hit_rates(historical, computed_baselines)
 
     # Merge combine data into draft data if available
     if combine_data is not None and len(combine_data) > 0:
@@ -249,7 +369,7 @@ def project_rookies(
             floor = max(0.0, avg_ppg - std_ppg)
             source = "rookie_model"
         else:
-            baseline = _round_baseline(position, round_num)
+            baseline = _round_baseline(position, round_num, computed_baselines)
             projected_points = baseline["projected_points"]
             projected_ppg = baseline["projected_ppg"]
             ceiling = baseline["ceiling"]
@@ -257,7 +377,7 @@ def project_rookies(
             source = "rookie_model"
 
         # Apply position-specific hit-rate regression
-        hit_rate = _get_hit_rate(position, round_num)
+        hit_rate = _get_hit_rate(position, round_num, computed_hit_rates)
         projected_points *= hit_rate
         projected_ppg *= hit_rate
         ceiling *= hit_rate
@@ -286,8 +406,8 @@ def _project_from_baselines_only(draft_data: pl.DataFrame) -> pl.DataFrame:
         position = normalize_position(rookie["position"])
         if not position:
             continue  # OL and other non-scoring positions
-        baseline = _round_baseline(position, rookie["round"])
-        hit_rate = _get_hit_rate(position, rookie["round"])
+        baseline = _round_baseline(position, rookie["round"], computed_baselines=None)
+        hit_rate = _get_hit_rate(position, rookie["round"], computed_rates=None)
         results.append({
             "player_id": rookie["gsis_id"],
             "player_name": rookie["pfr_player_name"],

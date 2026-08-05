@@ -6,6 +6,8 @@ Fantasy football draft analyzer. Uses prior-year NFL statistics to project playe
 
 ```bash
 # Python 3.12+ required
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 
 # Run full pipeline (fetch → score → project → rank)

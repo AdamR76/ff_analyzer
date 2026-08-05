@@ -1,5 +1,0 @@
-tech: python, postgres database if needed
-source data/api: nflreadpy
-
-objective: analyze prior year real nfl statistics to determine the current year fantasy football draft.
-goal: make player predictions using nfl statistics for fantasy football draft. Will have league scoring rules, total members, draft rounds. Will have access to draft position eventually.

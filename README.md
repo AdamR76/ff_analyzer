@@ -23,18 +23,30 @@ First run downloads 3 seasons of NFL data via [nflreadpy](https://github.com/nfl
 ## How It Works
 
 ```
-nflreadpy  ──►  Fetch  ──►  Score  ──►  Project  ──►  Rank  ──►  CSV output
-  (NFL data)    raw.parquet   scored.parquet   projections      rankings/tiers/strategy
+nflreadpy  ──►  Fetch  ──►  PBP Aggregate  ──►  Score  ──►  Project  ──►  Rank  ──►  CSV output
+  (NFL data)    raw.parquet   game-level stats    scored.parquet   projections      rankings/tiers/strategy
 ```
 
 ### Stage 1 — Fetch
-Pulls player stats and team defense stats from nflreadpy for the last 3 seasons. Filters to regular season only. Writes `data/raw/{season}.parquet`.
+Pulls player stats, team defense stats, and play-by-play data from nflreadpy for the last 3 seasons. Filters to regular season only. Writes `data/raw/{season}.parquet`.
+
+### Stage 1.5 — PBP Aggregate
+Pre-aggregates play-by-play data into game-level stats (TD distance bonuses, pick-six penalties, defense situational stats, blocked kicks, special teams subs). Joins into raw parquets so the scoring engine can apply all rules. Module: `pbp_aggregate.py`.
 
 ### Stage 2 — Score
-Applies league scoring rules from `scoring.txt` to every player, every game. Computes fantasy points per game for each player-season. Writes `data/processed/{season}_scores.parquet`.
+Applies league scoring rules from `scoring.txt` to every player, every game. Computes fantasy points per game for each player-season. Scoring engine is fully dynamic — no stat-to-points mapping is hardcoded. Writes `data/processed/{season}_scores.parquet`.
 
 ### Stage 3 — Project
-Three-year weighted projection model (current: 50%, previous: 30%, oldest: 20%). Position-specific adjustments for DEF/K regression, RB age cliff, WR breakout, and TE elite tier. Rookies projected via comparable-player model using draft capital and combine data. Writes `data/projections/2026_projections.parquet`.
+Three-year weighted projection model (current: 50%, previous: 30%, oldest: 20%). Position-specific adjustments:
+- **Age curves** — declining multipliers for aging players (RB: 27+, WR: 29+, TE: 30+, QB: 35+)
+- **Injury model** — Bayesian games-played projection using career history (not hardcoded 17)
+- **Partial-season shrinkage** — low-sample PPGs regressed toward positional mean
+- **Trend adjustment** — ascending/descending PPG trajectory factored in (capped ±15%)
+- **WR 3rd-year breakout** — bonus for year-3 WRs with ascending performance
+- **TE elite flag** — premium for top-3 TEs
+- **QB rushing baseline** — floor boost for rushing QBs
+
+Rookies projected via comparable-player model using draft capital and combine data, with data-driven hit rates and round baselines computed from historical data. Writes `data/projections/2026_projections.parquet`.
 
 ### Stage 4 — Rank
 Computes VORP (Value Over Replacement) from roster-driven replacement levels. Assigns tiers based on VORP gaps. Generates snake draft strategy showing best available players at each of your picks. Writes `output/rankings.csv`, `output/tiers.csv`, `output/strategy.csv`.
@@ -63,7 +75,6 @@ stat_key | points | unit | description
 | `per_tfl` | Per tackle for loss |
 | `per_safety` | Per safety |
 | `per_block` | Per blocked kick |
-| `per_punt` | Per forced punt |
 | `per_3nout` | Per 3-and-out forced |
 | `per_stop` | Per 4th down stop |
 | `per_pat` | Per PAT made |
@@ -71,7 +82,7 @@ stat_key | points | unit | description
 | `per_2pt` | Per 2-point conversion |
 | `game` | Flat bonus/penalty once per game |
 
-Threshold-based stats (e.g. `def_pa_7_13`, `fg_miss_0_19`, `rec_40`) encode ranges in the key name.
+Threshold-based stats (e.g. `def_pa_7_13`, `fg_miss_0_19`, `rec_40`) encode ranges in the key name. TD distance bonuses (`pass_td_40`, `rush_td_50`, etc.) and defense situational stats (`def_3nout`, `def_4down_stop`) are derived from play-by-play data.
 
 Lines starting with `#` are comments. Blank lines are ignored.
 
@@ -82,13 +93,13 @@ python run_pipeline.py --scoring my_league_scoring.txt
 
 ### Roster (`roster.txt`)
 
-Comma-separated position slots. One line for starters, one line for bench/IR.
+Single comma-separated line of position slots:
 
 ```
-QB,RB,RB,WR,WR,TE,WRT,WRT,WRTQ,K,DEF,LB,DB,BN,BN,BN,BN,BN,BN,BN,IR,IR
+QB,RB,RB,WR,TE,WRT,WRT,WRT,WRTQ,K,K,DEF,LB,DB,BN,BN,BN,BN,BN,BN,BN,IR,IR
 ```
 
-Line 1 = starters, line 2 = bench/IR. Use `--roster` to point at a custom file:
+Flex slots (`WRT` = RB/WR/TE, `WRTQ` = QB/RB/WR/TE superflex) and bench slots (`BN`) determine replacement levels for VORP calculations. Use `--roster` to point at a custom file:
 ```bash
 python run_pipeline.py --roster my_roster.txt
 ```
@@ -107,6 +118,13 @@ python run_pipeline.py --roster my_roster.txt
 | `FF_ROSTER_FILE` | `roster.txt` | Path to roster config file |
 | `FF_DATA_DIR` | `data` | Directory for raw/processed/projection data |
 | `FF_OUTPUT_DIR` | `output` | Directory for CSV output |
+| `FF_AGE_CURVE` | `true` | Enable age-based projection adjustments |
+| `FF_WR_BREAKOUT` | `true` | Enable WR 3rd-year breakout bonus |
+| `FF_TE_ELITE` | `true` | Enable TE elite tier premium |
+| `FF_QB_RUSHING_BASELINE` | `true` | Enable QB rushing floor boost |
+| `FF_INJURY_MODEL` | `true` | Enable data-driven games-played projection |
+| `FF_TREND_ADJUST` | `true` | Enable PPG trend adjustment |
+| `FF_SHRINKAGE` | `true` | Enable partial-season PPG shrinkage |
 
 ### CLI flags
 
@@ -145,6 +163,7 @@ ff_analyzer/
 ├── run_pipeline.py      # Main entry point (stages 1-4)
 ├── config.py            # Env var + CLI arg loader
 ├── fetch.py             # Stage 1: nflreadpy → Parquet
+├── pbp_aggregate.py     # Stage 1.5: play-by-play → game-level stats
 ├── score.py             # Stage 2: scoring engine wrapper
 ├── scoring_engine.py    # Dynamic rule parser + evaluator
 ├── project.py           # Stage 3: 3-year weighted projections

@@ -74,6 +74,8 @@ def test_run_rank_pipeline(tmp_path):
     assert result["rankings"].exists()
     assert result["tiers"].exists()
     assert result["strategy"].exists()
+    assert result.get("mock_draft") is not None
+    assert result["mock_draft"].exists()
 
     rankings = pl.read_csv(result["rankings"])
     assert "vorp" in rankings.columns
@@ -94,4 +96,13 @@ def test_run_rank_pipeline(tmp_path):
     assert "best_rb" in strategy.columns
     assert "best_wr" in strategy.columns
     assert "best_te" in strategy.columns
-    assert len(strategy) == 18  # one row per round
+    assert len(strategy) == 54  # 18 rounds * 3 options
+    assert "option" in strategy.columns
+    assert strategy["option"].to_list() == [1, 2, 3] * 18
+
+    mock_df = pl.read_csv(result["mock_draft"])
+    assert "overall_pick" in mock_df.columns
+    assert "team_slot" in mock_df.columns
+    assert "player_name" in mock_df.columns
+    assert "position" in mock_df.columns
+    assert len(mock_df) > 0

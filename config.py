@@ -32,7 +32,7 @@ def load_config(draft_position: int | None = None) -> dict:
         "draft_position": (
             draft_position
             if draft_position is not None
-            else _parse_optional_int(os.getenv("FF_DRAFT_POSITION"))
+            else _parse_optional_int(os.getenv("FF_DRAFT_POSITION", "5"))
         ),
         "weight_current": float(os.getenv("FF_WEIGHT_CURRENT", "0.50")),
         "weight_prev": float(os.getenv("FF_WEIGHT_PREV", "0.30")),

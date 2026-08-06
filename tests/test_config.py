@@ -8,7 +8,7 @@ def test_load_config_defaults():
 
     assert cfg["num_teams"] == 12
     assert cfg["draft_rounds"] == 20
-    assert cfg["draft_position"] is None
+    assert cfg["draft_position"] == 5
     assert cfg["weight_current"] == 0.50
     assert cfg["weight_prev"] == 0.30
     assert cfg["weight_oldest"] == 0.20

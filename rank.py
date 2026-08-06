@@ -7,6 +7,7 @@ Functional, no classes.
 import polars as pl
 from roster import parse_roster
 from vorp import compute_vorp, compute_tiers, _estimate_replacement_level
+from mock_draft import simulate_mock_draft
 from scoring_engine import POSITIONS
 
 
@@ -76,6 +77,14 @@ def run_rank_pipeline(cfg: dict, roster: dict | None = None) -> dict:
         strategy_df.write_csv(strategy_path)
         result["strategy"] = strategy_path
 
+    # Mock draft: simulate full 12-team snake draft
+    mock_draft_path = out_dir / "mock_draft.csv"
+    mock_df = simulate_mock_draft(
+        ranked, roster, cfg["num_teams"], cfg["draft_rounds"]
+    )
+    mock_df.write_csv(mock_draft_path)
+    result["mock_draft"] = mock_draft_path
+
     return result
 
 
@@ -115,34 +124,36 @@ def _build_strategy(
         round_num = i + 1
         still_available = ranked.filter(pl.col("overall_rank") >= overall_pick)
 
-        best_qb = still_available.filter(pl.col("position") == "QB").head(1)
-        best_rb = still_available.filter(pl.col("position") == "RB").head(1)
-        best_wr = still_available.filter(pl.col("position") == "WR").head(1)
-        best_te = still_available.filter(pl.col("position") == "TE").head(1)
-        best_k = still_available.filter(pl.col("position") == "K").head(1)
-        best_def = still_available.filter(pl.col("position") == "DEF").head(1)
-        best_lb = still_available.filter(pl.col("position") == "LB").head(1)
-        best_db = still_available.filter(pl.col("position") == "DB").head(1)
+        best_qb = still_available.filter(pl.col("position") == "QB").head(3)
+        best_rb = still_available.filter(pl.col("position") == "RB").head(3)
+        best_wr = still_available.filter(pl.col("position") == "WR").head(3)
+        best_te = still_available.filter(pl.col("position") == "TE").head(3)
+        best_k = still_available.filter(pl.col("position") == "K").head(3)
+        best_def = still_available.filter(pl.col("position") == "DEF").head(3)
+        best_lb = still_available.filter(pl.col("position") == "LB").head(3)
+        best_db = still_available.filter(pl.col("position") == "DB").head(3)
 
-        rows.append({
-            "round": round_num,
-            "overall_pick": overall_pick,
-            "best_qb": best_qb["player_name"][0] if len(best_qb) > 0 else "",
-            "best_qb_vorp": best_qb["vorp"][0] if len(best_qb) > 0 else 0.0,
-            "best_rb": best_rb["player_name"][0] if len(best_rb) > 0 else "",
-            "best_rb_vorp": best_rb["vorp"][0] if len(best_rb) > 0 else 0.0,
-            "best_wr": best_wr["player_name"][0] if len(best_wr) > 0 else "",
-            "best_wr_vorp": best_wr["vorp"][0] if len(best_wr) > 0 else 0.0,
-            "best_te": best_te["player_name"][0] if len(best_te) > 0 else "",
-            "best_te_vorp": best_te["vorp"][0] if len(best_te) > 0 else 0.0,
-            "best_k": best_k["player_name"][0] if len(best_k) > 0 else "",
-            "best_k_vorp": best_k["vorp"][0] if len(best_k) > 0 else 0.0,
-            "best_def": best_def["player_name"][0] if len(best_def) > 0 else "",
-            "best_def_vorp": best_def["vorp"][0] if len(best_def) > 0 else 0.0,
-            "best_lb": best_lb["player_name"][0] if len(best_lb) > 0 else "",
-            "best_lb_vorp": best_lb["vorp"][0] if len(best_lb) > 0 else 0.0,
-            "best_db": best_db["player_name"][0] if len(best_db) > 0 else "",
-            "best_db_vorp": best_db["vorp"][0] if len(best_db) > 0 else 0.0,
-        })
+        for option_idx in range(3):
+            rows.append({
+                "round": round_num,
+                "overall_pick": overall_pick,
+                "option": option_idx + 1,
+                "best_qb": best_qb["player_name"][option_idx] if len(best_qb) > option_idx else "",
+                "best_qb_vorp": best_qb["vorp"][option_idx] if len(best_qb) > option_idx else 0.0,
+                "best_rb": best_rb["player_name"][option_idx] if len(best_rb) > option_idx else "",
+                "best_rb_vorp": best_rb["vorp"][option_idx] if len(best_rb) > option_idx else 0.0,
+                "best_wr": best_wr["player_name"][option_idx] if len(best_wr) > option_idx else "",
+                "best_wr_vorp": best_wr["vorp"][option_idx] if len(best_wr) > option_idx else 0.0,
+                "best_te": best_te["player_name"][option_idx] if len(best_te) > option_idx else "",
+                "best_te_vorp": best_te["vorp"][option_idx] if len(best_te) > option_idx else 0.0,
+                "best_k": best_k["player_name"][option_idx] if len(best_k) > option_idx else "",
+                "best_k_vorp": best_k["vorp"][option_idx] if len(best_k) > option_idx else 0.0,
+                "best_def": best_def["player_name"][option_idx] if len(best_def) > option_idx else "",
+                "best_def_vorp": best_def["vorp"][option_idx] if len(best_def) > option_idx else 0.0,
+                "best_lb": best_lb["player_name"][option_idx] if len(best_lb) > option_idx else "",
+                "best_lb_vorp": best_lb["vorp"][option_idx] if len(best_lb) > option_idx else 0.0,
+                "best_db": best_db["player_name"][option_idx] if len(best_db) > option_idx else "",
+                "best_db_vorp": best_db["vorp"][option_idx] if len(best_db) > option_idx else 0.0,
+            })
 
     return pl.DataFrame(rows)

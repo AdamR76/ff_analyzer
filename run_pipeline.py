@@ -71,6 +71,9 @@ def main(argv: list[str] | None = None) -> dict:
     strategy = rank_result.get("strategy")
     if strategy is not None and strategy.exists():
         print(f"  Strategy: {strategy}")
+    mock_draft = rank_result.get("mock_draft")
+    if mock_draft is not None and mock_draft.exists():
+        print(f"  Mock Draft: {mock_draft}")
 
     print("\n=== Done ===")
     return {

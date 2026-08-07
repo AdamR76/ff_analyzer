@@ -2,7 +2,7 @@
 """Fantasy Football Draft Analyzer — main pipeline runner.
 
 Usage:
-    python run_pipeline.py [--pick N] [--scoring FILE] [--roster FILE]
+    python run_pipeline.py [--pick N] [--rounds N] [--scoring FILE] [--roster FILE]
 
 Runs all four stages: fetch -> score -> project -> rank.
 Stages are independent -- run individually if needed:
@@ -31,6 +31,8 @@ def main(argv: list[str] | None = None) -> dict:
         cfg["scoring_file"] = overrides["scoring_file"]
     if "roster_file" in overrides:
         cfg["roster_file"] = overrides["roster_file"]
+    if "rounds" in overrides:
+        cfg["draft_rounds"] = overrides["rounds"]
 
     print("=== Fantasy Football Draft Analyzer ===\n")
     print(f"League: {cfg['num_teams']} teams, {cfg['draft_rounds']} rounds")

@@ -11,7 +11,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Run full pipeline (fetch → score → project → rank)
-python run_pipeline.py --pick 5 --scoring path/to/file --roster path/to/roster
+python run_pipeline.py --pick 5 --rounds 20 --scoring path/to/file --roster path/to/roster
 
 # Run individual stages
 python fetch.py
@@ -133,6 +133,7 @@ python run_pipeline.py --roster my_roster.txt
 | Flag | Description |
 |------|-------------|
 | `--pick N` | Your draft position (1-based) |
+| `--rounds N` | Number of draft rounds (default: 20) |
 | `--scoring FILE` | Path to custom scoring rules file |
 | `--roster FILE` | Path to custom roster config file |
 

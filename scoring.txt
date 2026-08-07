@@ -93,21 +93,21 @@ bonus_20car    |  2.00 | game      | 20+ rush attempts
 bonus_qb_1st   |  1.00 | per_1st   | First down bonus — QB
 
 # --- IDP (Individual Defensive Players) ---
-idp_td         |  6.00 | per_td    | IDP touchdown
+idp_td         |  6.00 | per_td    | IDP TD
 idp_sack       |  4.00 | per_sack  | Sack
-idp_qb_hit     |  1.00 | per_td    | Hit on QB (per event)
-idp_tackle     |  1.00 | per_td    | Tackle (combined)
-idp_tfl        |  2.00 | per_tfl   | Tackle for loss
-idp_blk_kick   |  3.00 | per_block | Blocked punt, PAT or FG
+idp_qb_hit     |  1.00 | per_td    | Hit on QB
+idp_tackle     |  1.00 | per_td    | Tackle
+idp_tfl        |  2.00 | per_tfl   | Tackle For Loss
+idp_blk_kick   |  3.00 | per_block | Blocked Punt, PAT or FG
 idp_int        |  6.00 | per_int   | Interception
-idp_int_yd     |  0.10 | per_yd    | INT return yards
-idp_fum_rec    |  3.00 | per_fum   | Fumble recovery
-idp_fum_yd     |  0.10 | per_yd    | Fumble return yards
-idp_ff         |  3.00 | per_ff    | Forced fumble
+idp_int_yd     |  0.10 | per_yd    | INT Return Yards
+idp_fum_rec    |  3.00 | per_fum   | Fumble Recovery
+idp_fum_yd     |  0.10 | per_yd    | Fumble Return Yards
+idp_ff         |  3.00 | per_ff    | Forced Fumble
 idp_safety     |  3.00 | per_safety| Safety
-idp_ast_tackle |  1.00 | per_td    | Assisted tackle
-idp_solo_tackle|  2.00 | per_td    | Solo tackle
-idp_pass_def   |  3.00 | per_td    | Pass defended
-idp_tackle_10  |  2.00 | game      | 10+ tackle bonus
-idp_int_td_50  |  2.00 | per_td    | 50+ yard INT return TD bonus
-idp_fum_td_50  |  2.00 | per_td    | 50+ yard fumble return TD bonus
+idp_ast_tackle |  1.00 | per_td    | Assisted Tackle
+idp_solo_tackle|  2.00 | per_td    | Solo Tackle
+idp_pass_def   |  3.00 | per_td    | Pass Defended
+idp_tackle_10  |  2.00 | game      | 10+ Tackle Bonus
+idp_int_td_50  |  2.00 | per_td    | 50+ Yard Interception Return TD Bonus
+idp_fum_td_50  |  2.00 | per_td    | 50+ Yard Fumble Return TD Bonus

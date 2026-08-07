@@ -55,8 +55,8 @@ def load_config(draft_position: int | None = None) -> dict:
 def parse_args(argv: list[str] | None = None) -> dict:
     """Parse CLI args, return overrides dict.
 
-    Supported: --pick N, --scoring FILE, --roster FILE
-    Keys match load_config dict keys: pick, scoring_file, roster_file
+    Supported: --pick N, --scoring FILE, --roster FILE, --rounds N
+    Keys match load_config dict keys: pick, scoring_file, roster_file, rounds
     """
     import sys
 
@@ -72,6 +72,9 @@ def parse_args(argv: list[str] | None = None) -> dict:
             i += 2
         elif args[i] == "--roster" and i + 1 < len(args):
             overrides["roster_file"] = Path(args[i + 1])
+            i += 2
+        elif args[i] == "--rounds" and i + 1 < len(args):
+            overrides["rounds"] = int(args[i + 1])
             i += 2
         elif args[i].startswith("-"):
             import warnings

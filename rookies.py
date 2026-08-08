@@ -158,7 +158,7 @@ def _find_comparables(
     return pos_df.sort("similarity", maintain_order=True).head(top_k)
 
 
-def _join_historical_drafts(historical: pl.DataFrame) -> pl.DataFrame:
+def _join_historical_drafts(historical: pl.DataFrame, train_years: list[int] | None = None) -> pl.DataFrame:
     """Join historical draft picks into scored data to enable comparable matching.
 
     Scored data from data/processed/ has game-level nflreadpy columns only
@@ -167,8 +167,10 @@ def _join_historical_drafts(historical: pl.DataFrame) -> pl.DataFrame:
 
     If nflreadpy fails or returns empty, historical is returned unchanged.
     """
+    if train_years is None:
+        train_years = [2023, 2024, 2025]
     try:
-        draft_hist = nfl.load_draft_picks(seasons=[2023, 2024, 2025])
+        draft_hist = nfl.load_draft_picks(seasons=train_years)
     except Exception:
         return historical
 
@@ -285,12 +287,14 @@ def project_rookies(
     scored_data_dir: Path,
     draft_data: pl.DataFrame,
     combine_data: pl.DataFrame | None = None,
+    train_years: list[int] | None = None,
 ) -> pl.DataFrame:
     """Project fantasy points for incoming rookies using comparable-player model.
 
     scored_data_dir: path to data/processed/ with *_scores.parquet files
-    draft_data: Polars DataFrame from nflreadpy.load_draft_picks(seasons=[2026])
-    combine_data: optional Polars DataFrame from nflreadpy.load_combine(seasons=[2026])
+    draft_data: Polars DataFrame from nflreadpy.load_draft_picks()
+    combine_data: optional Polars DataFrame from nflreadpy.load_combine()
+    train_years: historical draft seasons for comparable matching
 
     Returns DataFrame with veteran-matching projection schema, all source="rookie_model".
     """
@@ -308,7 +312,7 @@ def project_rookies(
     # If scored data lacks draft capital (pick/round columns), join with
     # historical draft picks so the comparable-player model can activate.
     if "pick" not in historical.columns:
-        historical = _join_historical_drafts(historical)
+        historical = _join_historical_drafts(historical, train_years)
 
     # Get set of player_ids already in historical data (veterans)
     existing_ids = set(historical["player_id"].unique().to_list())

@@ -33,21 +33,26 @@ def main(argv: list[str] | None = None) -> dict:
         cfg["roster_file"] = overrides["roster_file"]
     if "rounds" in overrides:
         cfg["draft_rounds"] = overrides["rounds"]
+    if "train_years" in overrides:
+        cfg["train_years"] = overrides["train_years"]
+    if "target_year" in overrides:
+        cfg["target_year"] = overrides["target_year"]
 
     print("=== Fantasy Football Draft Analyzer ===\n")
     print(f"League: {cfg['num_teams']} teams, {cfg['draft_rounds']} rounds")
     if cfg["draft_position"]:
         print(f"Draft position: #{cfg['draft_position']}")
+    print(f"Training on: {cfg['train_years']} -> projecting {cfg['target_year']}")
     print()
 
     # Stage 1: Fetch
     print("[1/4] Fetching raw data from nflreadpy...")
-    fetch_result = fetch_raw_data(cfg)
+    fetch_result = fetch_raw_data(cfg, seasons=cfg["train_years"])
     for season, count in fetch_result["row_counts"].items():
         print(f"  {season}: {count} rows -> {fetch_result['output_paths'][season]}")
 
     # Fetch team defense data (separate source: nflreadpy team_stats)
-    def_result = fetch_team_defense(cfg)
+    def_result = fetch_team_defense(cfg, seasons=cfg["train_years"])
     for season, count in def_result["row_counts"].items():
         print(f"  {season}: {count} DEF rows -> {def_result['output_paths'][season]}")
 
@@ -61,7 +66,7 @@ def main(argv: list[str] | None = None) -> dict:
 
     # Stage 3: Project
     print("\n[3/4] Running projections...")
-    proj_result = run_projection_pipeline(cfg)
+    proj_result = run_projection_pipeline(cfg, train_seasons=cfg["train_years"])
     print(f"  {proj_result['player_count']} players projected")
     print(f"  Output: {proj_result['output_path']}")
 

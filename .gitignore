@@ -5,3 +5,4 @@ venv/
 data/
 output/
 .pytest_cache/
+docs/

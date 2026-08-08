@@ -7,15 +7,17 @@ writes 2026 projections parquet. Functional, no classes.
 import polars as pl
 from scoring_engine import POSITIONS, normalize_position
 from rookies import project_rookies
+from team_context import compute_team_factors, apply_team_context
 
 
-def run_projection_pipeline(cfg: dict) -> dict:
+def run_projection_pipeline(cfg: dict, train_seasons: list[int] | None = None) -> dict:
     """Run 3-year weighted projections for all positions.
 
     cfg: config dict from load_config()
+    train_seasons: optional list of seasons to train on (default: all in processed/)
 
     Returns dict with keys:
-        output_path: Path       -- path to 2026_projections.parquet
+        output_path: Path       -- path to {target_year}_projections.parquet
         player_count: int       -- number of players projected
     """
     data_dir = cfg["data_dir"]
@@ -27,10 +29,12 @@ def run_projection_pipeline(cfg: dict) -> dict:
     w_prev = cfg.get("weight_prev", 0.30)
     w_old = cfg.get("weight_oldest", 0.20)
 
-    # Load all scored seasons into dict
+    # Load scored seasons — optionally filtered to train_seasons
     season_dfs = {}
     for path in sorted(proc_dir.glob("*_scores.parquet")):
         season = int(path.stem.replace("_scores", ""))
+        if train_seasons is not None and season not in train_seasons:
+            continue
         season_dfs[str(season)] = pl.read_parquet(path)
 
     # Load player bio once for all positions
@@ -53,12 +57,16 @@ def run_projection_pipeline(cfg: dict) -> dict:
         result = result.with_columns(pl.lit("historical").alias("source"))
 
     # Project rookies via comparable-player model
+    target_year = cfg.get("target_year", 2026)
     try:
         import nflreadpy as nfl
-        draft_2026 = nfl.load_draft_picks(seasons=[2026])
-        if len(draft_2026) > 0:
-            combine_2026 = _safe_load_combine()
-            rookies_df = project_rookies(proc_dir, draft_2026, combine_2026)
+        draft_current = nfl.load_draft_picks(seasons=[target_year])
+        if len(draft_current) > 0:
+            combine_current = _safe_load_combine(target_year)
+            rookies_df = project_rookies(
+                proc_dir, draft_current, combine_current,
+                train_years=cfg.get("train_years", [2023, 2024, 2025]),
+            )
             if len(rookies_df) > 0:
                 result = pl.concat([result, rookies_df], how="diagonal_relaxed")
     except Exception as e:
@@ -66,10 +74,21 @@ def run_projection_pipeline(cfg: dict) -> dict:
         import warnings
         warnings.warn(f"Rookie projection failed: {e}")
 
-    # Filter out retired/inactive players
-    result = _filter_active_players(result)
+    # Apply team context adjustments (pace, pass rate, Vegas lines)
+    if cfg.get("team_context_enabled", True) and len(result) > 0:
+        try:
+            train_years = cfg.get("train_years", [2023, 2024, 2025])
+            team_factors = compute_team_factors(train_years)
+            if team_factors:
+                result = apply_team_context(result, team_factors)
+        except Exception as e:
+            import warnings
+            warnings.warn(f"Team context adjustment failed: {e}")
 
-    out_path = proj_dir / "2026_projections.parquet"
+    # Filter out retired/inactive players
+    result = _filter_active_players(result, target_year)
+
+    out_path = proj_dir / f"{target_year}_projections.parquet"
     result.write_parquet(out_path)
 
     return {
@@ -78,11 +97,11 @@ def run_projection_pipeline(cfg: dict) -> dict:
     }
 
 
-def _safe_load_combine():
+def _safe_load_combine(target_year: int = 2026):
     """Load combine data, returning None if unavailable (network, missing year)."""
     try:
         import nflreadpy as nfl
-        return nfl.load_combine(seasons=[2026])
+        return nfl.load_combine(seasons=[target_year])
     except Exception:
         return None
 
@@ -105,12 +124,12 @@ def _load_player_bio() -> pl.DataFrame | None:
         return None
 
 
-def _filter_active_players(df: pl.DataFrame) -> pl.DataFrame:
+def _filter_active_players(df: pl.DataFrame, target_year: int = 2026) -> pl.DataFrame:
     """Remove retired and inactive players from projections.
 
     Joins with nflreadpy.load_players() to get player status and last_season.
-    Keeps: rookies (source="rookie_model") and players active in 2025+.
-    Drops: players whose last season was 2024 or earlier, retired, cut.
+    Keeps: rookies (source="rookie_model") and players active in target_year-1+.
+    Drops: players whose last season was before target_year-1, retired, cut.
     """
     if len(df) == 0:
         return df
@@ -126,11 +145,12 @@ def _filter_active_players(df: pl.DataFrame) -> pl.DataFrame:
         df = df.join(players, on="player_id", how="left")
 
         # Keep rookies (no player db entry, source guarantees they're current)
-        # and players with last_season >= 2025
+        # and players with last_season >= target_year - 1
+        active_cutoff = target_year - 1
         df = df.filter(
             (pl.col("source") == "rookie_model")
             | pl.col("last_season").is_null()
-            | (pl.col("last_season") >= 2025)
+            | (pl.col("last_season") >= active_cutoff)
         )
 
         # Drop the join column
@@ -260,6 +280,14 @@ def _project_position(
         (pl.col("weighted_ppg_sum") / pl.col("weight_sum")).alias("projected_ppg"),
     ).drop(["weighted_ppg_sum", "weight_sum"])
 
+    # Drop players with no weight in the training window (e.g., only played
+    # in seasons outside the 3-year window). weight_sum=0 → NaN projected_ppg.
+    projections = projections.filter(
+        pl.col("projected_ppg").is_not_nan() & pl.col("projected_ppg").is_not_null()
+    )
+    if len(projections) == 0:
+        return None
+
     # ── Injury model: data-driven games played projection ──
     if cfg.get("injury_model_enabled", True):
         SHRINKAGE_PRIOR = 3  # prior weight in seasons
@@ -386,7 +414,7 @@ def _apply_position_adjustments(
         df = _apply_age_curve(df, position, cfg)
 
         if position == "WR" and cfg.get("wr_breakout_enabled", True):
-            df = _apply_wr_breakout(df, season_dfs)
+            df = _apply_wr_breakout(df, season_dfs, cfg.get("target_year", 2026))
 
         if position == "TE" and cfg.get("te_elite_enabled", True):
             df = _apply_te_elite(df)
@@ -456,10 +484,11 @@ def _apply_age_curve(df: pl.DataFrame, position: str, cfg: dict) -> pl.DataFrame
         return df
     no_bio = df.filter(pl.col("birth_date").is_null())
 
+    target_year = cfg.get("target_year", 2026)
     df = valid_bio.with_columns(
         pl.col("birth_date").str.slice(0, 4).cast(pl.Int32).alias("birth_year")
     ).with_columns(
-        (pl.lit(2026) - pl.col("birth_year")).alias("age")
+        (pl.lit(target_year) - pl.col("birth_year")).alias("age")
     )
 
     # Build age multiplier expression: start at 1.0, apply lowest applicable
@@ -492,18 +521,19 @@ def _apply_age_curve(df: pl.DataFrame, position: str, cfg: dict) -> pl.DataFrame
 
 
 def _apply_wr_breakout(
-    df: pl.DataFrame, season_dfs: dict[str, pl.DataFrame]
+    df: pl.DataFrame, season_dfs: dict[str, pl.DataFrame], target_year: int = 2026
 ) -> pl.DataFrame:
     """Apply breakout bonus for WRs entering year 3 with ascending PPG.
 
-    WRs drafted in 2024 (year 3 in 2026) whose year-2 PPG > year-1 PPG
+    WRs drafted in target_year-2 (year 3 in target_year) whose year-2 PPG > year-1 PPG
     get a 1.08 multiplier. Flat trend gets 1.03.
     """
     if "draft_year" not in df.columns:
         return df
 
+    breakout_draft_year = target_year - 2
     year3_wrs = df.filter(
-        (pl.col("position") == "WR") & (pl.col("draft_year") == 2024)
+        (pl.col("position") == "WR") & (pl.col("draft_year") == breakout_draft_year)
     )
     if len(year3_wrs) == 0:
         return df

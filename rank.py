@@ -25,7 +25,8 @@ def run_rank_pipeline(cfg: dict, roster: dict | None = None) -> dict:
     if roster is None:
         roster = parse_roster(cfg.get("roster_file", "roster.txt"))
 
-    proj_path = cfg["data_dir"] / "projections" / "2026_projections.parquet"
+    target_year = cfg.get("target_year", 2026)
+    proj_path = cfg["data_dir"] / "projections" / f"{target_year}_projections.parquet"
     projections = pl.read_parquet(proj_path)
 
     out_dir = cfg["output_dir"]

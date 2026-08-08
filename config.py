@@ -18,6 +18,8 @@ def load_config(draft_position: int | None = None) -> dict:
         num_teams: int          (default 12, env: FF_NUM_TEAMS)
         draft_rounds: int       (default 20, env: FF_DRAFT_ROUNDS)
         draft_position: int|None  (arg override, env: FF_DRAFT_POSITION)
+        train_years: list[int]  (default [2023,2024,2025], env: FF_TRAIN_YEARS)
+        target_year: int        (default 2026, env: FF_TARGET_YEAR)
         weight_current: float   (default 0.50, env: FF_WEIGHT_CURRENT)
         weight_prev: float      (default 0.30, env: FF_WEIGHT_PREV)
         weight_oldest: float    (default 0.20, env: FF_WEIGHT_OLDEST)
@@ -34,6 +36,8 @@ def load_config(draft_position: int | None = None) -> dict:
             if draft_position is not None
             else _parse_optional_int(os.getenv("FF_DRAFT_POSITION", "5"))
         ),
+        "train_years": _parse_int_list(os.getenv("FF_TRAIN_YEARS", "2023,2024,2025")),
+        "target_year": int(os.getenv("FF_TARGET_YEAR", "2026")),
         "weight_current": float(os.getenv("FF_WEIGHT_CURRENT", "0.50")),
         "weight_prev": float(os.getenv("FF_WEIGHT_PREV", "0.30")),
         "weight_oldest": float(os.getenv("FF_WEIGHT_OLDEST", "0.20")),
@@ -49,14 +53,17 @@ def load_config(draft_position: int | None = None) -> dict:
         "injury_model_enabled": os.getenv("FF_INJURY_MODEL", "true").lower() == "true",
         "trend_adjustment_enabled": os.getenv("FF_TREND_ADJUST", "true").lower() == "true",
         "shrinkage_enabled": os.getenv("FF_SHRINKAGE", "true").lower() == "true",
+        "team_context_enabled": os.getenv("FF_TEAM_CONTEXT", "true").lower() == "true",
     }
 
 
 def parse_args(argv: list[str] | None = None) -> dict:
     """Parse CLI args, return overrides dict.
 
-    Supported: --pick N, --scoring FILE, --roster FILE, --rounds N
-    Keys match load_config dict keys: pick, scoring_file, roster_file, rounds
+    Supported: --pick N, --scoring FILE, --roster FILE, --rounds N,
+               --train-years Y1,Y2,Y3, --target-year YYYY
+    Keys match load_config dict keys: pick, scoring_file, roster_file,
+        rounds, train_years, target_year
     """
     import sys
 
@@ -76,11 +83,18 @@ def parse_args(argv: list[str] | None = None) -> dict:
         elif args[i] == "--rounds" and i + 1 < len(args):
             overrides["rounds"] = int(args[i + 1])
             i += 2
+        elif args[i] == "--train-years" and i + 1 < len(args):
+            overrides["train_years"] = _parse_int_list(args[i + 1])
+            i += 2
+        elif args[i] == "--target-year" and i + 1 < len(args):
+            overrides["target_year"] = int(args[i + 1])
+            i += 2
         elif args[i].startswith("-"):
             import warnings
             warnings.warn(
                 f"Unrecognized argument: '{args[i]}'. "
-                f"Supported: --pick N, --scoring FILE, --roster FILE"
+                f"Supported: --pick N, --scoring FILE, --roster FILE, "
+                f"--rounds N, --train-years Y1,Y2,Y3, --target-year YYYY"
             )
             # Skip the unknown flag and its next arg if it looks like a value
             if i + 1 < len(args) and not args[i + 1].startswith("-"):
@@ -90,6 +104,11 @@ def parse_args(argv: list[str] | None = None) -> dict:
         else:
             i += 1
     return overrides
+
+
+def _parse_int_list(value: str) -> list[int]:
+    """Parse comma-separated ints, e.g. '2023,2024,2025' -> [2023, 2024, 2025]."""
+    return [int(x.strip()) for x in value.split(",") if x.strip()]
 
 
 def _parse_optional_int(value: str | None) -> int | None:
